@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # 1. Database Service (The only thing you usually run in Docker locally)
+  db:
+    image: postgres:15-alpine
+    container_name: rag_quiz_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: securepassword123
+      POSTGRES_DB: quiz_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d quiz_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. App Service (Optional: Run this if you want to test the full Docker build)
+  # If you are using 'uv run app.py' locally, you don't strictly need to start this service.
+  web:
+    build: .
+    container_name: rag_quiz_app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      # This points to the container name 'db' defined above
+      DB_USER: admin
+      DB_PASS: securepassword123
+      DB_NAME: quiz_db
+      DB_HOST: db   # <--- Crucial: Tells SQLAlchemy to look for the container, not localhost
+      OPENAI_API_KEY: ${OPENAI_API_KEY} # Reads from your local .env file
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
